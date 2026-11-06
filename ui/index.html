@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>琉璃记 · LexiGlass — 现代毛玻璃全能记忆工作台</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- 网易云音乐 × Codex 极光流体背景层 -->
+  <div class="aurora-canvas">
+    <div class="aurora-blob b1"></div>
+    <div class="aurora-blob b2"></div>
+    <div class="aurora-blob b3"></div>
+  </div>
+
+  <div class="app-shell">
+    <!-- 顶部无边框毛玻璃栏 -->
+    <header class="titlebar">
+      <div class="brand-group">
+        <div class="brand-logo">🫧</div>
+        <span class="brand-title">琉璃记 · LexiGlass</span>
+        <span class="brand-badge">Rust · Acrylic Studio</span>
+      </div>
+
+      <div class="titlebar-center">
+        <div class="cmd-search-trigger" id="openCmdPaletteBtn" title="搜索任意四六级单词、熟词僻义或技术卡片">
+          <span>🔍 搜索 1,500+ 单词 / 熟词僻义 / 随手记...</span>
+          <span class="kbd-tag">Ctrl + K</span>
+        </div>
+      </div>
+
+      <div class="titlebar-actions">
+        <button class="glass-btn" id="openAddCardModalBtn" title="添加单词、命令或任意知识卡片">
+          ➕ 新建记忆卡
+        </button>
+        <button class="glass-btn bubble-launch" id="popoutBubbleWinBtn" title="在大屏幕右下角弹出独立置顶的「随手记」毛玻璃气泡小窗">
+          🫧 弹出角落随手记小窗
+        </button>
+      </div>
+    </header>
+
+    <!-- 主工作台 -->
+    <div class="workspace">
+      <!-- 左侧卡组与统计导航 -->
+      <aside class="sidebar">
+        <div>
+          <div class="sidebar-section-title">
+            <span>📚 记忆卡组 (记单词 & 记万物)</span>
+          </div>
+          <div class="deck-list" id="deckListContainer"></div>
+        </div>
+
+        <div>
+          <div class="sidebar-section-title">
+            <span>📊 今日艾宾浩斯记忆看板</span>
+          </div>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-value" id="statTodayCount">0</div>
+              <div class="stat-label">今日已记卡片</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="statMasteredCount">0</div>
+              <div class="stat-label">已掌握 / 熟记</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="statStarredCount">0</div>
+              <div class="stat-label">★ 重点与生词本</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="statJotCount">0</div>
+              <div class="stat-label">🫧 随手记词条</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: auto; padding: 12px; border-radius: 14px; background: rgba(56,189,248,0.07); border: 1px solid rgba(56,189,248,0.2); font-size: 11.5px; color: var(--text-secondary); line-height: 1.6;">
+          <div style="color: var(--accent-cyan); font-weight: 600; margin-bottom: 4px;">⌨️ 极客全键盘流快捷键</div>
+          <div><span class="kbd-tag">Space</span> 翻转卡片 · <span class="kbd-tag">V</span> 朗读发音</div>
+          <div style="margin-top: 3px;"><span class="kbd-tag">1~4</span> 艾宾浩斯评分 · <span class="kbd-tag">S</span> 标星 ★</div>
+          <div style="margin-top: 3px;"><span class="kbd-tag">←/→</span> 上一张/下一张 · <span class="kbd-tag">Alt+B</span> 随手记</div>
+        </div>
+      </aside>
+
+      <!-- 右侧核心训练舞台 -->
+      <main class="main-stage">
+        <div class="stage-toolbar">
+          <div class="mode-tabs">
+            <button class="mode-tab active" data-mode="flashcard">🎴 3D 琉璃闪卡</button>
+            <button class="mode-tab" data-mode="dictation">⌨️ 沉浸听写拼写</button>
+            <button class="mode-tab" data-mode="grid">📋 词表速刷与遮挡自测</button>
+          </div>
+
+          <div class="filter-controls">
+            <select class="glass-select" id="groupSelect"></select>
+            <select class="glass-select" id="filterSelect">
+              <option value="all">全部卡片</option>
+              <option value="starred">★ 仅看重点/星标词</option>
+              <option value="learning">🔥 待复习 / 模糊词</option>
+              <option value="mastered">✅ 已掌握</option>
+            </select>
+            <button class="glass-btn" id="shuffleCardsBtn" title="乱序洗牌当前组">🔀 乱序</button>
+          </div>
+        </div>
+
+        <!-- 模式 1：3D 琉璃闪卡 -->
+        <section class="flashcard-arena" id="flashcardPanel">
+          <div class="card-perspective">
+            <div class="glass-flashcard" id="mainFlashcard">
+              <!-- 正面 -->
+              <div class="flashcard-face flashcard-front">
+                <div class="card-top-bar">
+                  <div class="card-badges">
+                    <span class="pill-badge" id="cardGroupBadge">第1组</span>
+                    <span class="pill-badge pos" id="cardPosBadge">adj.</span>
+                    <span class="pill-badge star" id="cardStarBadge" style="display:none;">★ 核心必考</span>
+                  </div>
+                  <div style="display:flex; gap:8px;">
+                    <button class="glass-btn" id="speakWordBtn" title="真题发音 (快捷键 V)">🔊 朗读</button>
+                    <button class="glass-btn" id="toggleStarBtn" title="加入/取消重点星标 (快捷键 S)">⭐ 星标</button>
+                  </div>
+                </div>
+
+                <div class="card-center-content">
+                  <div class="word-main" id="cardFrontText">vulnerable</div>
+                  <div style="margin-top: 12px; font-size: 13px; color: var(--text-secondary);" id="cardFrontHint">
+                    点击卡片或按 <span class="kbd-tag">Space</span> 翻转查看释义与搭配
+                  </div>
+                </div>
+
+                <div class="card-bottom-bar">
+                  <span id="cardProgressText">1 / 20</span>
+                  <span id="cardStatusText">状态：新词</span>
+                </div>
+              </div>
+
+              <!-- 背面 -->
+              <div class="flashcard-face flashcard-back">
+                <div class="card-top-bar">
+                  <div class="card-badges">
+                    <span class="pill-badge pos" id="cardBackPosBadge">adj.</span>
+                    <span class="pill-badge" id="cardIntervalBadge">复习间隔: 今日</span>
+                  </div>
+                  <button class="glass-btn" id="speakWordBackBtn">🔊 再听一遍</button>
+                </div>
+
+                <div class="card-center-content">
+                  <div style="font-size: 26px; font-weight: 700; color: #fff;" id="cardBackWord">vulnerable</div>
+                  <div class="meaning-main" id="cardBackMeaning">易受伤的；脆弱的；易受影响的（be vulnerable to）</div>
+                  <div class="card-note-box" id="cardBackNote" style="display:none;"></div>
+                </div>
+
+                <div class="card-bottom-bar">
+                  <span>按数字键 <span class="kbd-tag">1</span> ~ <span class="kbd-tag">4</span> 记录记忆程度</span>
+                  <span>SM-2 艾宾浩斯智能调度</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 底部艾宾浩斯四档反馈栏 -->
+          <div class="rating-bar">
+            <button class="glass-btn" id="prevCardBtn" style="height:52px; padding:0 16px;">⬅️ 上一张</button>
+            <button class="rate-btn again" data-grade="1">
+              <span class="rate-title">1 · 忘了 Again</span>
+              <span class="rate-sub">立即重现</span>
+            </button>
+            <button class="rate-btn hard" data-grade="2">
+              <span class="rate-title">2 · 模糊 Hard</span>
+              <span class="rate-sub">1天后复习</span>
+            </button>
+            <button class="rate-btn good" data-grade="3">
+              <span class="rate-title">3 · 认识 Good</span>
+              <span class="rate-sub">3~7天复习</span>
+            </button>
+            <button class="rate-btn easy" data-grade="4">
+              <span class="rate-title">4 · 秒答 Easy</span>
+              <span class="rate-sub">标为已掌握</span>
+            </button>
+            <button class="glass-btn" id="nextCardBtn" style="height:52px; padding:0 16px;">下一张 ➡️</button>
+          </div>
+        </section>
+
+        <!-- 模式 2：沉浸听写拼写模式 -->
+        <section class="dictation-panel" id="dictationPanel">
+          <div class="dictation-box">
+            <div class="pill-badge pos" id="dictPosBadge" style="display:inline-block; margin-bottom:12px;">adj.</div>
+            <div style="font-size: 24px; font-weight: 700; color: #fff;" id="dictMeaningText">
+              易受伤的；脆弱的；易受影响的
+            </div>
+            <div style="margin-top: 10px;">
+              <button class="glass-btn" id="dictSpeakBtn">🔊 播放单词发音</button>
+              <button class="glass-btn" id="dictHintBtn">💡 提示首字母</button>
+            </div>
+            <input type="text" class="dictation-input" id="dictInput" placeholder="输入英文单词或命令后按 Enter 校验..." autocomplete="off" />
+            <div id="dictFeedback" style="margin-top: 14px; font-size: 14px; min-height: 22px;"></div>
+          </div>
+        </section>
+
+        <!-- 模式 3：瀑布流词表与遮挡自测 -->
+        <section class="grid-panel" id="gridPanel">
+          <div style="display:flex; gap:10px; margin-bottom:12px;">
+            <button class="glass-btn" id="maskMeaningBtn">🙈 遮住中文释义自测（悬停显示）</button>
+            <button class="glass-btn" id="maskWordBtn">🙈 遮住正面默写（悬停显示）</button>
+          </div>
+          <div class="vocab-table-scroll">
+            <table class="vocab-table">
+              <thead>
+                <tr>
+                  <th style="width: 60px;">#</th>
+                  <th style="width: 240px;">正面（单词 / 问题 / 命令）</th>
+                  <th style="width: 90px;">词性/分类</th>
+                  <th>背面（中文释义 / 详解 / 搭配）</th>
+                  <th style="width: 100px;">状态</th>
+                </tr>
+              </thead>
+              <tbody id="vocabTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- ===== 大屏角落「随手记」悬浮气泡组件（内嵌联动 + 可独立弹出角落窗口） ===== -->
+  <div class="corner-bubble-dock" id="cornerBubbleDock">
+    <!-- 展开态：随手记毛玻璃输入浮层 -->
+    <div class="bubble-popover" id="bubblePopover">
+      <div class="popover-header">
+        <div class="popover-title">
+          <span>🫧 随手记 · Quick Jot</span>
+          <span class="brand-badge">自动查词 & 记万物</span>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="glass-btn" id="openStandaloneBubbleBtn" style="height:26px; padding:0 8px; font-size:11px;" title="弹出为大屏右下角独立小窗口">↗ 独立窗</button>
+          <button class="glass-btn" id="closePopoverBtn" style="height:26px; padding:0 8px; font-size:11px;">✕</button>
+        </div>
+      </div>
+
+      <div class="jot-form">
+        <input type="text" class="jot-input" id="jotWordInput" placeholder="输入生词(自动补全释义) 或 任意笔记/命令..." autocomplete="off" />
+        <input type="text" class="jot-input" id="jotTransInput" placeholder="释义 / 备注（若填四六级词会自动匹配）" autocomplete="off" />
+        <div class="jot-row">
+          <select class="glass-select" id="jotTagSelect" style="flex:1; height:32px;">
+            <option value="#六级生词">#六级生词</option>
+            <option value="#熟词僻义">#熟词僻义</option>
+            <option value="#Linux与C语言">#Linux与C语言</option>
+            <option value="#灵感与待办">#灵感与待办</option>
+          </select>
+          <button class="glass-btn primary" id="saveJotBtn" style="height:32px;">➕ 随手记下</button>
+        </div>
+      </div>
+
+      <div style="font-size: 11px; color: var(--text-muted); display:flex; justify-content:space-between;">
+        <span>最近随手记（点击 🔊 发音 / ➕ 转入闪卡）</span>
+        <span id="jotTotalBadge">0 条</span>
+      </div>
+      <div class="jot-list" id="jotListContainer"></div>
+    </div>
+
+    <!-- 折叠态：大屏角落迷你单词漫游胶囊 -->
+    <div class="bubble-mini-pill" id="bubbleMiniPill" title="点击展开「随手记」面板，或点击词条切换下一个">
+      <div class="orb-pulse">🫧</div>
+      <div class="ticker-content" id="bubbleTickerArea">
+        <div class="ticker-word" id="tickerWord">unprecedented ★</div>
+        <div class="ticker-meaning" id="tickerMeaning">adj. 史无前例的；空前的</div>
+      </div>
+      <button class="pill-quick-btn" id="toggleJotPopoverBtn">✍️ 随手记</button>
+    </div>
+  </div>
+
+  <!-- ===== 模态框 1：Ctrl+K 全局搜索面板 ===== -->
+  <div class="modal-backdrop" id="cmdModal">
+    <div class="modal-glass">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-weight:700; font-size:15px;">🔍 全局检索（1,534 张四六级词汇与技术卡）</span>
+        <button class="glass-btn" id="closeCmdModalBtn" style="height:28px;">ESC</button>
+      </div>
+      <input type="text" class="jot-input" id="cmdSearchInput" placeholder="输入英文单词、中文意思或 Linux/C语言关键词..." style="font-size:15px; padding:12px;" />
+      <div class="jot-list" id="cmdSearchResults" style="max-height: 320px;"></div>
+    </div>
+  </div>
+
+  <!-- ===== 模态框 2：新建任意记忆卡（记单词 / 记命令 / 记其它） ===== -->
+  <div class="modal-backdrop" id="addCardModal">
+    <div class="modal-glass">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-weight:700; font-size:15px;">➕ 新建记忆卡片（记单词 / 记技术 / 记万物）</span>
+        <button class="glass-btn" id="closeAddCardModalBtn" style="height:28px;">✕</button>
+      </div>
+      <select class="glass-select" id="newCardDeckSelect" style="width:100%; height:38px;"></select>
+      <input type="text" class="jot-input" id="newCardFront" placeholder="卡片正面：英文单词 / 技术问题 / Linux命令" />
+      <input type="text" class="jot-input" id="newCardPos" placeholder="词性或分类标签（如 adj. / C语言 / 运维规则）" />
+      <input type="text" class="jot-input" id="newCardBack" placeholder="卡片背面：中文释义 / 答案详解" />
+      <input type="text" class="jot-input" id="newCardNote" placeholder="补充笔记 / 真题搭配 / 代码示例（选填）" />
+      <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:6px;">
+        <button class="glass-btn primary" id="confirmAddCardBtn">💾 保存到卡组</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="data/builtin_decks.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

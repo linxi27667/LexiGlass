@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>随手记 · LexiGlass 大屏角落气泡窗</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body {
+      background: transparent;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 0;
+    }
+    .bubble-win-shell {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: linear-gradient(155deg, rgba(16, 21, 33, 0.90), rgba(10, 14, 24, 0.95));
+      backdrop-filter: blur(28px) saturate(190%);
+      -webkit-backdrop-filter: blur(28px) saturate(190%);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      padding: 14px;
+      gap: 12px;
+      overflow: hidden;
+    }
+    .mini-card-stage {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.14), rgba(129, 140, 248, 0.12));
+      border: 1px solid rgba(56, 189, 248, 0.32);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .mini-card-stage:hover {
+      border-color: rgba(56, 189, 248, 0.6);
+    }
+  </style>
+</head>
+<body>
+  <div class="aurora-canvas">
+    <div class="aurora-blob b1"></div>
+    <div class="aurora-blob b2"></div>
+  </div>
+
+  <div class="bubble-win-shell">
+    <!-- 顶部拖拽与控制栏 -->
+    <div style="display:flex; align-items:center; justify-content:space-between; -webkit-app-region: drag;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div class="orb-pulse" style="width:26px; height:26px; font-size:13px;">🫧</div>
+        <span style="font-size:13.5px; font-weight:700; color:#fff;">随手记 · 角落气泡窗</span>
+      </div>
+      <div style="display:flex; gap:6px; -webkit-app-region: no-drag;">
+        <button class="glass-btn" id="bAutoPlayBtn" style="height:26px; padding:0 8px; font-size:11px;">⏱ 轮播: 开</button>
+        <button class="glass-btn" id="bSpeakBtn" style="height:26px; padding:0 8px; font-size:11px;">🔊</button>
+        <button class="glass-btn" id="bNextWordBtn" style="height:26px; padding:0 8px; font-size:11px;">⏭ 下一个</button>
+      </div>
+    </div>
+
+    <!-- 角落单词漫游胶囊（点击切换释义模糊/清晰，悬停记单词） -->
+    <div class="mini-card-stage" id="bMiniStage" title="点击朗读并切换下一个六级核心词">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span class="pill-badge pos" id="bPos">adj.</span>
+        <span style="font-size:11px; color:var(--text-secondary);" id="bGroup">CET-6 · 第1组</span>
+      </div>
+      <div style="font-size:22px; font-weight:800; color:#fff; letter-spacing:0.2px;" id="bWord">vulnerable ★</div>
+      <div style="font-size:13.5px; color:var(--accent-cyan); font-weight:500;" id="bMeaning">易受伤的；脆弱的；易受影响的（be vulnerable to）</div>
+    </div>
+
+    <!-- 随手记极速输入框（记单词 / 记命令 / 记灵感） -->
+    <div class="jot-form">
+      <input type="text" class="jot-input" id="bJotWord" placeholder="✍️ 随手记单词(自动查词) 或 任意灵感/命令..." autocomplete="off" />
+      <div class="jot-row">
+        <input type="text" class="jot-input" id="bJotTrans" placeholder="释义/备注（输入四六级词可自动填充）" style="flex:1;" autocomplete="off" />
+        <button class="glass-btn primary" id="bSaveJotBtn" style="height:35px; flex-shrink:0;">➕ 记下</button>
+      </div>
+    </div>
+
+    <!-- 随手记实时列表 -->
+    <div style="font-size:11px; color:var(--text-muted); display:flex; justify-content:space-between;">
+      <span>📌 我的随手记（与主窗口实时同步）</span>
+      <span id="bJotCount">0 条</span>
+    </div>
+    <div class="jot-list" id="bJotList" style="max-height:none; flex:1;"></div>
+  </div>
+
+  <script src="data/builtin_decks.js"></script>
+  <script>
+    const STORAGE_KEY = "LEXIGLASS_STATE_V1";
+    const syncChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("lexiglass_sync") : null;
+    const builtinCards = window.LEXIGLASS_BUILTIN_CARDS || [];
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return {
+        quick_jots: [
+          { id: "jot-1", content: "unprecedented", translation: "adj. 史无前例的；空前的", pos: "adj.", tag: "#六级生词", created_at: "今日" },
+          { id: "jot-2", content: "address the crisis", translation: "熟词僻义：address v. 解决、应对（危机）", pos: "v.", tag: "#熟词僻义", created_at: "今日" }
+        ]
+      };
+    }
+
+    let state = loadState();
+    let tickerIdx = Math.floor(Math.random() * Math.min(200, builtinCards.length));
+    let autoPlay = true;
+
+    function speakText(text) {
+      if (!("speechSynthesis" in window)) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text.replace(/★/g, "").trim());
+      u.lang = "en-US";
+      u.rate = 0.95;
+      window.speechSynthesis.speak(u);
+    }
+
+    function renderTicker() {
+      if (!builtinCards.length) return;
+      const c = builtinCards[tickerIdx % builtinCards.length];
+      document.getElementById("bPos").textContent = c.pos || "vocab";
+      document.getElementById("bGroup").textContent = (c.deck_id === "cet6-core" ? "CET-6 · " : "") + (c.group_name || "");
+      document.getElementById("bWord").textContent = c.front + (c.starred ? " ★" : "");
+      document.getElementById("bMeaning").textContent = c.back;
+    }
+
+    function renderJots() {
+      state = loadState();
+      const jots = state.quick_jots || [];
+      document.getElementById("bJotCount").textContent = jots.length + " 条";
+      const container = document.getElementById("bJotList");
+      container.innerHTML = jots.map(j => `
+        <div class="jot-card">
+          <div class="jot-card-main">
+            <div class="jot-card-word">${j.content} <span class="pill-badge" style="font-size:10px; padding:1px 6px;">${j.tag || "#随手记"}</span></div>
+            <div class="jot-card-trans">${j.translation}</div>
+          </div>
+          <div style="display:flex; gap:4px;">
+            <button class="glass-btn" style="height:24px; padding:0 6px; font-size:11px;" onclick="speakText('${j.content.replace(/'/g, "")}')">🔊</button>
+            <button class="glass-btn" style="height:24px; padding:0 6px; font-size:11px;" onclick="removeJot('${j.id}')">✕</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    window.removeJot = function(id) {
+      state = loadState();
+      state.quick_jots = (state.quick_jots || []).filter(j => j.id !== id);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      if (syncChannel) syncChannel.postMessage({ type: "sync" });
+      renderJots();
+    };
+
+    document.getElementById("bJotWord").addEventListener("input", (e) => {
+      const val = e.target.value.trim().toLowerCase();
+      if (!val) return;
+      const found = builtinCards.find(c => c.front.toLowerCase() === val);
+      if (found) {
+        document.getElementById("bJotTrans").value = `${found.pos ? found.pos + " " : ""}${found.back}`;
+      }
+    });
+
+    function addJot() {
+      const wInput = document.getElementById("bJotWord");
+      const tInput = document.getElementById("bJotTrans");
+      const word = wInput.value.trim();
+      if (!word) return;
+      let trans = tInput.value.trim();
+      if (!trans) {
+        const found = builtinCards.find(c => c.front.toLowerCase() === word.toLowerCase());
+        trans = found ? `${found.pos || ""} ${found.back}` : "随手记条目";
+      }
+      state = loadState();
+      state.quick_jots = state.quick_jots || [];
+      state.quick_jots.unshift({
+        id: "jot-" + Date.now(),
+        content: word,
+        translation: trans,
+        pos: "随手记",
+        tag: /^[a-zA-Z\s\-]+$/.test(word) ? "#六级生词" : "#随手记",
+        created_at: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      if (syncChannel) syncChannel.postMessage({ type: "sync" });
+      wInput.value = "";
+      tInput.value = "";
+      renderJots();
+    }
+
+    document.getElementById("bSaveJotBtn").addEventListener("click", addJot);
+    document.getElementById("bJotWord").addEventListener("keydown", e => { if (e.key === "Enter") addJot(); });
+    document.getElementById("bJotTrans").addEventListener("keydown", e => { if (e.key === "Enter") addJot(); });
+
+    document.getElementById("bNextWordBtn").addEventListener("click", () => {
+      tickerIdx = (tickerIdx + 1) % builtinCards.length;
+      renderTicker();
+    });
+    document.getElementById("bSpeakBtn").addEventListener("click", () => {
+      const c = builtinCards[tickerIdx % builtinCards.length];
+      if (c) speakText(c.front);
+    });
+    document.getElementById("bMiniStage").addEventListener("click", () => {
+      const c = builtinCards[tickerIdx % builtinCards.length];
+      if (c) speakText(c.front);
+      tickerIdx = (tickerIdx + 1) % builtinCards.length;
+      renderTicker();
+    });
+    document.getElementById("bAutoPlayBtn").addEventListener("click", (e) => {
+      autoPlay = !autoPlay;
+      e.target.textContent = autoPlay ? "⏱ 轮播: 开" : "⏱ 轮播: 停";
+    });
+
+    setInterval(() => {
+      if (autoPlay) {
+        tickerIdx = (tickerIdx + 1) % builtinCards.length;
+        renderTicker();
+      }
+    }, 8000);
+
+    if (syncChannel) {
+      syncChannel.onmessage = () => renderJots();
+    }
+    window.addEventListener("storage", () => renderJots());
+
+    renderTicker();
+    renderJots();
+  </script>
+</body>
+</html>

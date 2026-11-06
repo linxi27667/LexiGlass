@@ -1,0 +1,28 @@
+[package]
+name = "lexiglass"
+version = "0.1.0"
+description = "琉璃记 (LexiGlass) — 基于 Rust 的现代毛玻璃全能记忆与大屏角落随手记气泡软件"
+authors = ["linxi27667 <linxi27667@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/linxi27667/LexiGlass"
+edition = "2021"
+
+[lib]
+name = "lexiglass_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0.0", features = ["tray-icon"] }
+window-vibrancy = "0.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.10", features = ["v4", "serde"] }
+dirs = "5.0"
+regex = "1.10"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-global-shortcut = "2.0.0"
